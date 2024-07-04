@@ -1,0 +1,117 @@
+# name: Whisper Fine-tune Pipeline
+
+# on:
+#   schedule:
+#     - cron: '0 0 1 * *'  # Runs at 00:00 UTC on the first day of every month
+#   workflow_dispatch:  # Allows manual trigger of the workflow
+
+# jobs:
+#   setup:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v3
+
+#       - name: Set up Python
+#         uses: actions/setup-python@v3
+#         with:
+#           python-version: '3.8'
+
+#       - name: Install dependencies
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install -r requirements.txt
+
+#       - name: Authenticate to GCP
+#         uses: google-github-actions/auth@v0
+#         with:
+#           credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+#       - name: Set up gcloud CLI
+#         uses: google-github-actions/setup-gcloud@v0
+#         with:
+#           project_id: '${{ secrets.GCP_PROJECT_ID }}'
+#           service_account_key: '${{ secrets.GCP_SA_KEY }}'
+#           export_default_credentials: true
+
+#       - name: Configure gcloud
+#         run: |
+#           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+#           gcloud config set compute/zone us-central1-a
+
+#       - name: Create GCP VM instance
+#         run: |
+#           gcloud compute instances create whisper-training-vm \
+#             --machine-type=n1-standard-8 \
+#             --image-family=tf2-latest-gpu \
+#             --image-project=deeplearning-platform-release \
+#             --maintenance-policy=TERMINATE \
+#             --accelerator=type=nvidia-tesla-t4,count=1 \
+#             --metadata='install-nvidia-driver=True' \
+#             --boot-disk-size=200GB \
+#             --scopes=https://www.googleapis.com/auth/cloud-platform \
+#             --tags=http-server,https-server
+
+#       - name: Transfer data and scripts to VM
+#         run: |
+#           gcloud compute scp --recurse src/ whisper-training-vm:~/whisper-finetune/src --zone=us-central1-a
+
+#   process_data:
+#     runs-on: ubuntu-latest
+#     needs: setup
+#     strategy:
+#       matrix:
+#         language: [en, es, fr, de, it]
+
+#     steps:
+#       - name: Download data for ${{ matrix.language }}
+#         run: |
+#           gcloud compute ssh whisper-training-vm --zone=us-central1-a --command="
+#             cd ~/whisper-finetune/src &&
+#             python download_data.py --lang=${{ matrix.language }}"
+
+#       - name: Chunk data for ${{ matrix.language }}
+#         run: |
+#           gcloud compute ssh whisper-training-vm --zone=us-central1-a --command="
+#             cd ~/whisper-finetune/src &&
+#             python chunk_data.py --lang=${{ matrix.language }}"
+
+#       - name: Process media transcriptions for ${{ matrix.language }}
+#         run: |
+#           gcloud compute ssh whisper-training-vm --zone=us-central1-a --command="
+#             cd ~/whisper-finetune/src &&
+#             python process_media_transcription.py --lang=${{ matrix.language }}"
+
+#   train_and_test:
+#     runs-on: ubuntu-latest
+#     needs: process_data
+
+#     steps:
+#       - name: Train and Test model sequentially
+#         run: |
+#           gcloud compute ssh whisper-training-vm --zone=us-central1-a --command="
+#             cd ~/whisper-finetune/src &&
+#             python train_model.py --lang=en --checkpoint_path=checkpoints/english_checkpoint &&
+#             python test_model.py --lang=en --checkpoint_path=checkpoints/english_checkpoint &&
+#             python train_model.py --lang=es --checkpoint_path=checkpoints/english_checkpoint &&
+#             python test_model.py --lang=es --checkpoint_path=checkpoints/spanish_checkpoint &&
+#             python train_model.py --lang=fr --checkpoint_path=checkpoints/spanish_checkpoint &&
+#             python test_model.py --lang=fr --checkpoint_path=checkpoints/french_checkpoint &&
+#             python train_model.py --lang=de --checkpoint_path=checkpoints/french_checkpoint &&
+#             python test_model.py --lang=de --checkpoint_path=checkpoints/german_checkpoint &&
+#             python train_model.py --lang=it --checkpoint_path=checkpoints/german_checkpoint &&
+#             python test_model.py --lang=it --checkpoint_path=checkpoints/italian_checkpoint"
+
+#       - name: Download trained model from VM
+#         run: |
+#           gcloud compute scp --recurse whisper-training-vm:~/whisper-finetune/src/models/whisper models/whisper-final --zone=us-central1-a
+
+#   cleanup:
+#     runs-on: ubuntu-latest
+#     needs: train_and_test
+
+#     steps:
+#       - name: Delete GCP VM instance
+#         run: |
+#           gcloud compute instances delete whisper-training-vm --zone=us-central1-a --quiet
