@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Union
 from datasets import DatasetDict, Audio, load_from_disk, concatenate_datasets
 from transformers.models.whisper.english_normalizer import BasicTextNormalizer
 from transformers import WhisperFeatureExtractor, WhisperTokenizer, WhisperProcessor, WhisperForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
-
+from torch.cuda.amp import GradScaler
 #######################     ARGUMENT PARSING        #########################
 
 parser = argparse.ArgumentParser(description='Fine-tuning script for Whisper Models of various sizes.')
@@ -14,16 +14,16 @@ parser.add_argument(
     '--model_name', 
     type=str, 
     required=False, 
-    default='openai/whisper-small', 
+    default='openai/whisper-large-v3', 
     help='Huggingface model name to fine-tune. Eg: openai/whisper-small'
 )
-parser.add_argument(
-    '--language', 
-    type=str, 
-    required=False, 
-    default='Hindi', 
-    help='Language the model is being adapted to in Camel case.'
-)
+# parser.add_argument(
+#     '--language', 
+#     type=str, 
+#     required=False, 
+#     default='Hindi', 
+#     help='Language the model is being adapted to in Camel case.'
+# )
 parser.add_argument(
     '--sampling_rate', 
     type=int, 
@@ -35,7 +35,7 @@ parser.add_argument(
     '--num_proc', 
     type=int, 
     required=False, 
-    default=2, 
+    default=1, 
     help='Number of parallel jobs to run. Helps parallelize the dataset prep stage.'
 )
 parser.add_argument(
@@ -56,14 +56,14 @@ parser.add_argument(
     '--warmup', 
     type=int, 
     required=False, 
-    default=20000, 
+    default=2000, 
     help='Number of warmup steps.'
 )
 parser.add_argument(
     '--train_batchsize', 
     type=int, 
     required=False, 
-    default=48, 
+    default=32, 
     help='Batch size during the training phase.'
 )
 parser.add_argument(
@@ -77,7 +77,7 @@ parser.add_argument(
     '--num_epochs', 
     type=int, 
     required=False, 
-    default=20, 
+    default=1, 
     help='Number of epochs to train for.'
 )
 parser.add_argument(
@@ -133,16 +133,17 @@ freeze_feature_encoder = False
 freeze_encoder = False
 
 do_normalize_eval = True
-do_lower_case = False
-do_remove_punctuation = False
+do_lower_case = True
+do_remove_punctuation = True
 normalizer = BasicTextNormalizer()
+scaler = GradScaler()
 
 
 #############################       MODEL LOADING       #####################################
 
 feature_extractor = WhisperFeatureExtractor.from_pretrained(args.model_name)
-tokenizer = WhisperTokenizer.from_pretrained(args.model_name, language=args.language, task="transcribe")
-processor = WhisperProcessor.from_pretrained(args.model_name, language=args.language, task="transcribe")
+tokenizer = WhisperTokenizer.from_pretrained(args.model_name, language=None, task="transcribe")
+processor = WhisperProcessor.from_pretrained(args.model_name, language=None, task="transcribe")
 model = WhisperForConditionalGeneration.from_pretrained(args.model_name)
 
 if model.config.decoder_start_token_id is None:
@@ -184,6 +185,8 @@ def prepare_dataset(batch):
 
     # compute log-Mel input features from input audio array 
     batch["input_features"] = processor.feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
+    batch["input_features1"] = processor.feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"],return_tensors="pt").input_features
+    processor.tokenizer.set_prefix_tokens(language=batch["language"], task="transcribe") 
     # compute input length of audio sample in seconds
     batch["input_length"] = len(audio["array"]) / audio["sampling_rate"]
     
@@ -196,6 +199,10 @@ def prepare_dataset(batch):
     
     # encode target text to label ids
     batch["labels"] = processor.tokenizer(transcription).input_ids
+    #print(batch["labels"])
+    #print(model.generate(batch["input_features1"]))
+    #print(f"label ---------------------- {batch["sentence"]}")
+    #print(f"prediction ----------------  {processor.batch_decode(model.generate(batch["input_features1"]))}")
     return batch
 
 max_label_length = model.config.max_length
@@ -253,26 +260,67 @@ print('DATASET PREPARATION COMPLETED')
 
 
 metric = evaluate.load("wer")
+# def compute_metrics(pred):
+#     pred_ids = pred.predictions
+#     label_ids = pred.label_ids
+
+#     # replace -100 with the pad_token_id
+#     label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
+
+#     # we do not want to group tokens when computing the metrics
+#     pred_str = processor.tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+#     label_str = processor.tokenizer.batch_decode(label_ids, skip_special_tokens=True)
+
+#     if do_normalize_eval:
+#         pred_str = [normalizer(pred) for pred in pred_str]
+#         label_str = [normalizer(label) for label in label_str]
+
+#     wer = 100 * metric.compute(predictions=pred_str, references=label_str)
+#     return {"wer": wer}
+
+# metric = evaluate.load("wer")
+
 def compute_metrics(pred):
     pred_ids = pred.predictions
     label_ids = pred.label_ids
 
-    # replace -100 with the pad_token_id
+    # Replace -100 with the pad_token_id
     label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
 
-    # we do not want to group tokens when computing the metrics
+    # Decode the predictions and labels
     pred_str = processor.tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     label_str = processor.tokenizer.batch_decode(label_ids, skip_special_tokens=True)
 
+    # Apply normalization if required
     if do_normalize_eval:
         pred_str = [normalizer(pred) for pred in pred_str]
         label_str = [normalizer(label) for label in label_str]
 
-    wer = 100 * metric.compute(predictions=pred_str, references=label_str)
+    # Print predictions and their labels side by side
+    #for p, l in zip(pred_str, label_str):
+       # print(f"Prediction: {p}\nLabel: {l}\n")
+
+    # Filter out empty predictions and labels
+    filtered_pred_str = []
+    filtered_label_str = []
+
+    for p, l in zip(pred_str, label_str):
+        if p.strip() and l.strip():
+            filtered_pred_str.append(p)
+            filtered_label_str.append(l)
+
+    # Print filtered predictions and labels count
+    # print("Filtered Predictions count:", len(filtered_pred_str))
+    # print("Filtered Labels count:", len(filtered_label_str))
+
+    # Calculate WER only for non-empty predictions and labels
+    wer = 100 * metric.compute(predictions=filtered_pred_str, references=filtered_label_str)
     return {"wer": wer}
 
 
-###############################     TRAINING ARGS AND TRAINING      ############################
+###############################     TRAINING ARGS AND TRAINING      ###########################
+
+
 
 if args.train_strategy == 'epoch':
     training_args = Seq2SeqTrainingArguments(
@@ -297,6 +345,7 @@ if args.train_strategy == 'epoch':
         greater_is_better=False,
         optim="adamw_bnb_8bit",
         resume_from_checkpoint=args.resume_from_ckpt,
+        push_to_hub=False,
     )
 
 elif args.train_strategy == 'steps':
@@ -324,6 +373,7 @@ elif args.train_strategy == 'steps':
         greater_is_better=False,
         optim="adamw_bnb_8bit",
         resume_from_checkpoint=args.resume_from_ckpt,
+        push_to_hub=False,
     )
 
 trainer = Seq2SeqTrainer(

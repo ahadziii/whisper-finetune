@@ -46,7 +46,7 @@ excluded_emails = [
 video_extensions = ('.mp4', '.avi', '.mov', '.m4v')
 
 # Local directory to save files
-local_directory = 'data/test/english'
+local_directory = 'data'
 log_directory = 'logs'
 media_directory = os.path.join(local_directory, 'media')
 transcription_directory = os.path.join(local_directory, 'transcriptions')
@@ -168,7 +168,6 @@ def process_files_from_excel(df, bucket, blobs):
         download_blob(bucket, transcript_blob_name, transcription_file_path)
 
 def audio_already_exists(video_blob_name):
-    """Checks if the audio file already exists."""
     audio_file_name = os.path.basename(video_blob_name).rsplit('.', 1)[0] + '.wav'
     audio_file_path = os.path.join(media_directory, audio_file_name)
     return os.path.exists(audio_file_path)
@@ -181,7 +180,7 @@ def main():
         blobs = list(bucket.list_blobs())
 
         # Read the Excel file
-        excel_file_path = 'test.xlsx'
+        excel_file_path = 'norway-train-2.xlsx'
         df = read_excel(excel_file_path)
         
         if df.empty:
