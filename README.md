@@ -69,6 +69,9 @@ This repository provides scripts and instructions for fine-tuning the Whisper au
    - `Transcript`: Name of the transcription file in Google Cloud Storage.
    - `Language`: Language of the audio & transcription file. eg `en` for English, `fi` for Finnish, `sv` for Swedish, `no` for Norwegian, `da` for Danish, `de` for German etc.
 
+   There is an example excel file in `example_template.xlsx` in the `excel_template` directory. You can download this file and fill in the audio and transcription file names along with the language code.
+
+
 2. **Download the dataset from Google Cloud Storage:**
 
    - Run the `process_data/download_dataset.py` script to download media and their corresponding transcription files listed in the excel sheet from the Google Cloud Storage bucket. This script further processes the video files by converting them to audio.
