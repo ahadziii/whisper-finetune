@@ -149,9 +149,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# python process_media_transcriptions.py --media_directory /path/to/media_dir \
-#                                        --transcription_directory /path/to/transcription_dir \
-#                                        --output /path/to/output_dir \
-#                                        --language en

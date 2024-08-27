@@ -95,9 +95,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# python prepare_whisper_data.py --source_audio_path path/to/audio_paths.txt \
-#                                --source_transcription_path path/to/transcriptions.txt \
-#                                --output_data_dir path/to/output/directory \
-#                                --language en

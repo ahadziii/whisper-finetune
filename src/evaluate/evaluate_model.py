@@ -183,6 +183,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# python evaluate_model.py --wav_path path/to/wav.txt --text_path path/to/text.txt --language en --log_directory logs --model_id /path/to/model --sample_rate 16000 --device cuda:0

@@ -249,13 +249,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-    # python script.py \
-    # --bucket_name my-gcs-bucket \
-    # --excel_file_path /home/user/data/file_list.xlsx \
-    # --media_directory /home/user/data/media \
-    # --transcription_directory /home/user/data/transcriptions \
-    # --log_directory /home/user/data/logs \
-    # --excluded_emails test@example.com another@example.com \
-    # --excluded_domains example.com test.com

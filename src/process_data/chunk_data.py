@@ -96,29 +96,34 @@ def parse_vtt(file_path):
     return chunks
 
 
-def save_chunks(audio, chunks, base_audio_path, base_transcript_path, output_media_dir, output_transcript_dir):
+def save_chunks(audio, chunks, base_audio_path, base_transcript_path, output_dir, language_code):
     """
-    Save audio chunks and transcripts to the output directories.
+    Save audio chunks and transcripts to the output directories, grouped by language.
 
     Parameters:
     - audio (AudioSegment): The full audio segment.
     - chunks (list): List of tuples with start time, end time, and text.
     - base_audio_path (str): Path to the base audio file.
     - base_transcript_path (str): Path to the base transcript file.
-    - output_media_dir (str): Directory to save audio chunks.
-    - output_transcript_dir (str): Directory to save transcript chunks.
+    - output_dir (str): Base output directory to save chunks.
+    - language_code (str): Language code to group the chunks by.
 
     Returns:
     - None
     """
     logging.info(f"Saving chunks for audio: {base_audio_path} and transcript: {base_transcript_path}")
     base_audio_name = os.path.splitext(os.path.basename(base_audio_path))[0]
-    
-    for i, (start, end, text) in enumerate(chunks):
-        chunk_audio_path = os.path.join(output_media_dir, f"{base_audio_name}_{i+1}.wav")
-        chunk_transcript_path = os.path.join(output_transcript_dir, f"{base_audio_name}_{i+1}.txt")
 
-        # Skip saving if chunk files already exist
+    # Create language-specific directories under the output directory
+    language_media_dir = os.path.join(output_dir, language_code, 'media')
+    language_transcript_dir = os.path.join(output_dir, language_code, 'transcriptions')
+    os.makedirs(language_media_dir, exist_ok=True)
+    os.makedirs(language_transcript_dir, exist_ok=True)
+
+    for i, (start, end, text) in enumerate(chunks):
+        chunk_audio_path = os.path.join(language_media_dir, f"{base_audio_name}_{i+1}.wav")
+        chunk_transcript_path = os.path.join(language_transcript_dir, f"{base_audio_name}_{i+1}.txt")
+
         if os.path.exists(chunk_audio_path) and os.path.exists(chunk_transcript_path):
             logging.info(f"Chunk {i+1} already exists. Skipping. Audio: {chunk_audio_path}, Transcript: {chunk_transcript_path}")
             continue
@@ -128,19 +133,18 @@ def save_chunks(audio, chunks, base_audio_path, base_transcript_path, output_med
         with open(chunk_transcript_path, 'w', encoding='utf-8') as f:
             f.write(text)
         
-        logging.info(f"Saved chunk {i+1}: {chunk_audio_path}, {chunk_transcript_path}")
+        logging.info(f"Saved chunk {i+1} in {language_code}: {chunk_audio_path}, {chunk_transcript_path}")
 
 
-def process_files(excel_path, base_audio_path, base_transcript_path, output_media_dir, output_transcript_dir):
+def process_files(excel_path, base_audio_path, base_transcript_path, output_dir):
     """
-    Process files listed in the Excel sheet.
+    Process files listed in the Excel sheet, chunk them, and save them grouped by language.
 
     Parameters:
     - excel_path (str): Path to the Excel file containing the list of audio and transcript files.
     - base_audio_path (str): Base directory containing audio files.
     - base_transcript_path (str): Base directory containing transcript files.
-    - output_media_dir (str): Directory to save processed audio chunks.
-    - output_transcript_dir (str): Directory to save processed transcript chunks.
+    - output_dir (str): Base directory to save processed chunks, organized by language.
 
     Returns:
     - None
@@ -151,6 +155,7 @@ def process_files(excel_path, base_audio_path, base_transcript_path, output_medi
         audio_file_name = os.path.splitext(row['Audio/Video'])[0] + '.wav'
         audio_path = os.path.join(base_audio_path, audio_file_name)
         transcript_path = os.path.join(base_transcript_path, row['Transcript'])
+        language_code = row['Language']  
 
         if not check_file_exists(audio_path) or not check_file_exists(transcript_path):
             logging.error(f"Files not found: {audio_path}, {transcript_path}")
@@ -166,7 +171,7 @@ def process_files(excel_path, base_audio_path, base_transcript_path, output_medi
                 logging.error(f"Unsupported transcript format: {transcript_path}")
                 continue
             
-            save_chunks(audio, chunks, audio_path, transcript_path, output_media_dir, output_transcript_dir)
+            save_chunks(audio, chunks, audio_path, transcript_path, output_dir, language_code)
 
         except Exception as e:
             logging.error(f"Error processing files {audio_path} and {transcript_path}: {str(e)}")
@@ -183,8 +188,7 @@ def parse_arguments():
     parser.add_argument("--excel_path", type=str, required=True, help="Path to the Excel file listing audio and transcript files")
     parser.add_argument("--base_audio_path", type=str, required=True, help="Base directory containing audio files")
     parser.add_argument("--base_transcript_path", type=str, required=True, help="Base directory containing transcript files")
-    parser.add_argument("--output_media_dir", type=str, required=True, help="Directory to save processed audio chunks")
-    parser.add_argument("--output_transcript_dir", type=str, required=True, help="Directory to save processed transcript chunks")
+    parser.add_argument("--output_dir", type=str, required=True, help="Base directory to save processed chunks, grouped by language")
     parser.add_argument("--log_directory", type=str, default='logs', help="Directory to save log files")
     return parser.parse_args()
 
@@ -193,8 +197,9 @@ def main():
     """
     Main function to execute the file processing.
 
-    Parses command line arguments, sets up logging, and processes files to create audio and transcript chunks.
-    
+    Parses command line arguments, sets up logging, and processes files to create audio and transcript chunks,
+    organized by language.
+
     Returns:
     - None
     """
@@ -203,7 +208,7 @@ def main():
         setup_logging(args.log_directory)
 
         logging.info("Starting the file processing")
-        process_files(args.excel_path, args.base_audio_path, args.base_transcript_path, args.output_media_dir, args.output_transcript_dir)
+        process_files(args.excel_path, args.base_audio_path, args.base_transcript_path, args.output_dir)
         logging.info("File processing completed")
 
     except Exception as e:
@@ -212,12 +217,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-# python chunk_data.py --excel_path <path_to_excel_file> \
-#                                     --base_audio_path <path_to_audio_files> \
-#                                     --base_transcript_path <path_to_transcript_files> \
-#                                     --output_media_dir <path_to_output_audio_chunks> \
-#                                     --output_transcript_dir <path_to_output_transcript_chunks> \
-#                                     --log_directory <path_to_log_directory>
