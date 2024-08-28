@@ -38,8 +38,8 @@ def parse_arguments():
     - argparse.Namespace: Parsed command line arguments.
     """
     parser = argparse.ArgumentParser(description="Transcribe audio files and calculate WER.")
-    parser.add_argument("--wav_path", type=str, required=True, help="Path to the file containing paths to WAV files")
-    parser.add_argument("--text_path", type=str, required=True, help="Path to the file containing text transcriptions")
+    parser.add_argument("--source_audio_path", type=str, required=True, help="Path to the file containing paths to WAV files")
+    parser.add_argument("--source_transcription_path", type=str, required=True, help="Path to the file containing text transcriptions")
     parser.add_argument("--language", type=str, required=True, help="Language of the audio files")
     parser.add_argument("--log_directory", type=str, default='logs', help="Directory to save log files")
     parser.add_argument("--model_id", type=str, default="/mnt/disks/disk-1/whisper-large", help="Model ID or path")
@@ -65,20 +65,20 @@ def load_model_and_processor(model_id, language, device):
     model = WhisperForConditionalGeneration.from_pretrained(model_id).to(device)
     return processor, model
 
-def prepare_data(wav_path, text_path):
+def prepare_data(source_audio_path, source_transcription_path):
     """
     Prepare the dataset by reading audio and transcription file paths.
 
     Parameters:
-    - wav_path (str): Path to the file containing paths to WAV files.
-    - text_path (str): Path to the file containing text transcriptions.
+    - source_audio_path (str): Path to the file containing paths to WAV files.
+    - source_transcription_path (str): Path to the file containing text transcriptions.
 
     Returns:
     - Dataset: Dataset containing audio file paths and transcriptions.
     """
-    logging.info(f"Reading audio and transcription file paths from: {wav_path} and {text_path}")
-    wav_l = [temp.strip() for temp in open(wav_path).readlines()]
-    text_l = [temp.strip() for temp in open(text_path).readlines()]
+    logging.info(f"Reading audio and transcription file paths from: {source_audio_path} and {source_transcription_path}")
+    wav_l = [temp.strip() for temp in open(source_audio_path).readlines()]
+    text_l = [temp.strip() for temp in open(source_transcription_path).readlines()]
     df = pd.DataFrame(data={"file": wav_l, "audio": wav_l, "text": text_l})
     df.to_csv("test.csv", sep=",", index=False)
     logging.info("Data saved to test.csv")
@@ -176,7 +176,7 @@ def main():
     setup_logging(args.log_directory)
     
     processor, model = load_model_and_processor(args.model_id, args.language, args.device)
-    eval_data = prepare_data(args.wav_path, args.text_path)
+    eval_data = prepare_data(args.source_audio_path, args.source_transcription_path)
     
     result_df = transcribe_and_calculate_wer(eval_data, processor, model, args.sample_rate, args.device, args.language)
     save_results(result_df, args.language, args.log_directory)

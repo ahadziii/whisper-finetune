@@ -58,7 +58,7 @@ def create_dataset(audio_paths, transcriptions, language):
     
     return audio_dataset
 
-def save_dataset(dataset, output_dir):
+def save_dataset(dataset, output_dir, language):
     """
     Save the dataset to disk.
 
@@ -69,7 +69,7 @@ def save_dataset(dataset, output_dir):
     Returns:
     - None
     """
-    dataset.save_to_disk(output_dir)
+    dataset.save_to_disk(output_dir + "/" + language) 
     print('Data preparation done')
 
 def main():
@@ -91,7 +91,7 @@ def main():
         return
 
     dataset = create_dataset(scp_entries, txt_entries, args.language)
-    save_dataset(dataset, args.output_data_dir)
+    save_dataset(dataset, args.output_data_dir, args.language)
 
 if __name__ == '__main__':
     main()
