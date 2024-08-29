@@ -31,7 +31,7 @@ This repository provides scripts and instructions for fine-tuning the Whisper au
 - **Dataset Download**: Download audio and transcription files from Google Cloud Storage.
 - **Dataset Preparation**: Process and chunk audio files with their corresponding transcriptions & prepare data for Whisper fine-tuning
 - **Fine-Tuning**: Fine-tune the Whisper model.
-- **Evaluation**: Benchmark the performance on existing model & evaluate the performance of the fine-tuned model on a test set using Word Error Rate (WER).
+- **Evaluation**: Benchmark the performance of existing model & evaluate the performance of the fine-tuned model on a test set using Word Error Rate (WER).
 
 ## Prerequisites
 
@@ -102,9 +102,9 @@ Note: You can skip this step if you already have a VM set up on GCP with GPU sup
    echo $SHELL
    ```
    - If the output is `/bin/bash`, run the following command:
-     ```bash
-     source ~/.bashrc
-     ```
+      ```bash
+       source ~/.bashrc
+         ```
    - If the output is `/bin/zsh`, run the following command:
      ```bash
        source ~/.zshrc
@@ -118,7 +118,7 @@ Note: You can skip this step if you already have a VM set up on GCP with GPU sup
        ```bash
        echo 'eval "$(/home/your_username/miniconda3/bin/conda shell.bash hook)"' >> ~/.bashrc
        ```
-         or
+
        ```bash
        echo 'eval "$(/home/your_username/miniconda3/bin/conda shell.zsh hook)"' >> ~/.zshrc
        ```
@@ -354,14 +354,14 @@ If you've attached a new disk to your VM, follow these steps to format and mount
     # language: language of the data
 
 
-   python evaluate/evaluate_model.py \
-    --source_audio_path path/to/media_lang.txt \
-    --source_transcription_path path/to/transcription_lang.txt \
-    --language en \
-    --log_directory path/to/log/directory \
-    --model_id /path/to/model \
-    --sample_rate 16000 \
-    --device cuda:0
+    python evaluate/evaluate_model.py \
+        --source_audio_path path/to/media_lang.txt \
+        --source_transcription_path path/to/transcription_lang.txt \
+        --language en \
+        --log_directory path/to/log/directory \
+        --model_id /path/to/model \
+        --sample_rate 16000 \
+        --device cuda:0
    ```
 
 ### Fine-Tuning
@@ -409,6 +409,21 @@ If you've attached a new disk to your VM, follow these steps to format and mount
 
    While all of the arguments are set with default options, one is encouraged to look into the file to customize the training hyperparameters in such a way that it suits the amount of data at hand and the size of the model being used.
 
+   Once the training is complete, the model will be saved in the output directory specified. If satisfied with the results from the training, you can move the contents of the output directory to a location of your choice using the command below:
+
+   
+   ```bash
+
+   # Copy necessary model file to a destination directory
+
+   cp op_dir_epoch/latest_checkpoint/* /path/to/destination
+   find op_dir_epoch/ -maxdepth 1 -type f -exec cp {} /path/to/destination/ \;
+
+   ```
+
+   The model can be used for inference or further fine-tuning as needed.
+
+
 
 
 ## Evaluate the Fine-Tuned Model
@@ -419,13 +434,13 @@ If you've attached a new disk to your VM, follow these steps to format and mount
 
    ```bash
    python evaluate/evaluate_model.py \
-    --source_audio_path path/to/wav.txt \
-    --source_transcription_path path/to/text.txt \
-    --language en \
-    --log_directory logs \
-    --model_id /path/to/model \
-    --sample_rate 16000 \
-    --device cuda:0
+        --source_audio_path path/to/media_lang.txt \
+        --source_transcription_path path/to/transcription_lang.txt \
+        --language en \
+        --log_directory path/to/log/directory \
+        --model_id /path/to/model \
+        --sample_rate 16000 \
+        --device cuda:0
    ```
    This script will calculate the Word Error Rate (WER) on the test set to assess the model’s performance.
 
