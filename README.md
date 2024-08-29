@@ -104,7 +104,7 @@ Note: You can skip this step if you already have a VM set up on GCP with GPU sup
    - If the output is `/bin/bash`, run the following command:
       ```bash
        source ~/.bashrc
-         ```
+
    - If the output is `/bin/zsh`, run the following command:
      ```bash
        source ~/.zshrc
@@ -344,11 +344,11 @@ If you've attached a new disk to your VM, follow these steps to format and mount
 
 1. **Benchmark the performance of the existing Whisper model:**
 
-   - Run the `evaluate/evaluate_model.py` script on the evaluation data to benchmark the performance of the existing Whisper model on a test set using Word Error Rate (WER).
+   - Run the `evaluate/evaluate_model.py` script on the evaluation data generated from the `process_data/process_media_transcription.py` script to benchmark the performance of the existing Whisper model on a test set using Word Error Rate (WER).
 
    ```bash
-    # source_audio_path: path to the file containing the paths to the audio files
-    # source_transcription_path: path to the file containing the transcriptions
+    # source_audio_path: path to the file containing the paths to the audio files in the evaluation set
+    # source_transcription_path: path to the file containing the transcriptions in the evaluation set
     # log_directory: path to the directory where the logs will be saved
     # model_id: model name ie. this can be a model name on Hugging Face or a path to the model on disk
     # language: language of the data
@@ -368,7 +368,7 @@ If you've attached a new disk to your VM, follow these steps to format and mount
 
 1. **Fine-tune the Whisper model:**
 
-   - Run the `train/fine-tune_on_custom_dataset.py` script to fine-tune the Whisper model on a custom dataset.
+   - Run the `train/fine-tune_on_custom_dataset.py` script to fine-tune the Whisper model on the custom dataset.
 
    ```bash
 
@@ -405,7 +405,7 @@ If you've attached a new disk to your VM, follow these steps to format and mount
         --eval_datasets output_data_directory/eval_dataset_1 output_data_directory/eval_dataset_2 output_data_directory/eval_dataset_3
    ```
 
-   The datasets being passed as parameters through the train_datasets and eval_datasets arguments should have been from the output directories generated through the data preparation stage. Multiple datasets can be used as a part of the fine-tuning process. These datasets would be concatenated and shuffled at the time of dataset preparation.
+   The datasets being passed as parameters through the train_datasets and eval_datasets arguments should have been from the output directories generated from the `process_data/prepare_whisper_data.py` script. Multiple datasets can be used as a part of the fine-tuning process. These datasets would be concatenated and shuffled at the time of dataset preparation.
 
    While all of the arguments are set with default options, one is encouraged to look into the file to customize the training hyperparameters in such a way that it suits the amount of data at hand and the size of the model being used.
 
@@ -430,7 +430,7 @@ If you've attached a new disk to your VM, follow these steps to format and mount
 
 1. **Evaluate the fine-tuned model:**
 
-   - Run the `evaluate/evaluate_model.py` script to evaluate the performance of the fine-tuned model on a test set using Word Error Rate (WER).
+   - Run the `evaluate/evaluate_model.py` script to evaluate the performance of the fine-tuned model on a test set generated from `process_data/process_media_transcription.py` script.
 
    ```bash
    python evaluate/evaluate_model.py \
